@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "Lorelight — Books for the Curious",
+  "short_name": "Lorelight",
+  "description": "A beautiful, quiet place to discover and read timeless books.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#111116",
+  "theme_color": "#111116",
+  "categories": ["books", "education", "entertainment"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

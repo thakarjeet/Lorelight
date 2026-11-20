@@ -20,10 +20,10 @@ function sendJson(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
-async function proxyBookRequest(target, response) {
+async function proxyBookRequest(target, response, timeoutMs = 20_000) {
   try {
     const upstream = await fetch(target, {
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const body = Buffer.from(await upstream.arrayBuffer());
     response.writeHead(upstream.status, {
@@ -53,6 +53,7 @@ function contentTypeFor(path) {
     ".png": "image/png",
     ".svg": "image/svg+xml",
     ".txt": "text/plain; charset=utf-8",
+    ".webmanifest": "application/manifest+json; charset=utf-8",
     ".webp": "image/webp",
   };
   return contentTypes[extname(path).toLowerCase()] ?? "application/octet-stream";
@@ -135,7 +136,7 @@ async function handleRequest(request, response) {
 
     const target = new URL(`https://www.gutenberg.org${resourcePath}`);
     target.search = requestUrl.search;
-    await proxyBookRequest(target, response);
+    await proxyBookRequest(target, response, 90_000);
     return;
   }
 

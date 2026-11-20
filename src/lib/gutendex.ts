@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+
 export interface BookAuthor {
   name: string;
   birth_year: number | null;
@@ -29,7 +31,12 @@ export interface BookPage {
 
 export function getBookAssetUrl(url: string): string {
   const source = new URL(url);
-  if (source.origin !== "https://www.gutenberg.org") return url;
+  if (
+    source.origin !== "https://www.gutenberg.org" ||
+    Capacitor.isNativePlatform()
+  ) {
+    return url;
+  }
   return `/api/gutenberg${source.pathname}${source.search}`;
 }
 
@@ -50,7 +57,8 @@ function isBook(value: unknown): value is Book {
     Array.isArray(book.subjects) &&
     Array.isArray(book.bookshelves) &&
     typeof book.formats === "object" &&
-    book.formats !== null
+    book.formats !== null &&
+    Object.values(book.formats).every((format) => typeof format === "string")
   );
 }
 
@@ -72,9 +80,13 @@ function isGeneralReading(book: Book): boolean {
     "handbooks",
     "grammar",
   ];
+  const hasPlainText =
+    typeof book.formats["text/plain; charset=utf-8"] === "string" ||
+    typeof book.formats["text/plain"] === "string";
 
   return (
-    book.copyright !== true &&
+    book.copyright === false &&
+    hasPlainText &&
     !excludedTerms.some((term) => catalogText.includes(term))
   );
 }
@@ -83,7 +95,9 @@ export async function fetchBooks(
   query: BookQuery,
   signal: AbortSignal,
 ): Promise<BookPage> {
-  const url = new URL("/api/gutendex/", window.location.origin);
+  const url = Capacitor.isNativePlatform()
+    ? new URL("https://gutendex.com/books/")
+    : new URL("/api/gutendex/", window.location.origin);
   url.searchParams.set("languages", "en");
   url.searchParams.set("sort", "popular");
   if (query.page && query.page > 1) {
@@ -158,15 +172,42 @@ export function paginateBook(text: string, pageSize = 1900): string[][] {
   let page: string[] = [];
   let pageLength = 0;
 
-  for (const paragraph of paragraphs) {
-    if (page.length && pageLength + paragraph.length > pageSize) {
+  for (const originalParagraph of paragraphs) {
+    let remaining = originalParagraph;
+    while (remaining.length > 0) {
+      const available = pageSize - pageLength - (page.length ? 1 : 0);
+      if (available <= 0) {
+        pages.push(page);
+        page = [];
+        pageLength = 0;
+        continue;
+      }
+
+      let end = Math.min(remaining.length, available);
+      if (end < remaining.length) {
+        const boundary = remaining.lastIndexOf(" ", end);
+        if (boundary > 0) end = boundary;
+      }
+
+      const paragraph = remaining.slice(0, end).trim();
+      if (paragraph) {
+        page.push(paragraph);
+        pageLength += paragraph.length;
+      }
+      remaining = remaining.slice(end).trimStart();
+
+      if (remaining.length > 0) {
+        pages.push(page);
+        page = [];
+        pageLength = 0;
+      }
+    }
+
+    if (page.length && pageLength >= pageSize) {
       pages.push(page);
       page = [];
       pageLength = 0;
     }
-
-    page.push(paragraph);
-    pageLength += paragraph.length;
   }
 
   if (page.length) pages.push(page);
